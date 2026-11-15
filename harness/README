@@ -1,6 +1,6 @@
 # Harness
 
-A single-binary Windows CLI tool written in Go that attaches to an **existing Gemini web conversation** (including chats started with your custom Gems), uploads images from `.input/`, sends prompts serially one-by-one, and saves each response to `.data/<tag>.md`.
+A single-binary Windows CLI tool written in Go that attaches to an **existing Gemini web conversation** (including chats started with your custom Gems), uploads images from `.data-harness-gemini-in/`, sends prompts serially one-by-one, and saves each response to `.data-harness-gemini-out/<tag>.md`.
 
 ## Prerequisites
 
@@ -17,7 +17,7 @@ harness/
 ├── go.mod
 ├── main.go
 ├── README.md
-└── .input/
+└── .data-harness-gemini-in/
     ├── human-prompts.json
     ├── image1.png
     ├── image2.jpg

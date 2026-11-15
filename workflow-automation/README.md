@@ -62,7 +62,7 @@ The CLI loads a `.env` file from the working directory (if present).
 | `GOOGLE_FLOW_EMAIL` | Google account email for Flow sign-in |
 | `GOOGLE_FLOW_PASSWORD` | Google account password for Flow sign-in |
 
-Scheduling data lives in `.data/scheduling-engine/fb-reels.json`. Browser cookies are persisted to `cookies.json` in the workspace root.
+Scheduling data lives in `.data-workflow-fb-schedule-in/metadata.json` (with raw videos in `.data-workflow-fb-schedule-in/raw/`). Browser cookies are persisted to `cookies.json` in the workspace root.
 
 ## Project Structure
 
@@ -84,7 +84,7 @@ Scheduling data lives in `.data/scheduling-engine/fb-reels.json`. Browser cookie
 │   │   └── config.go                # .env loading & Config struct
 │   ├── data/
 │   │   ├── models.go                # JSON data models (Post, SchedulingInfo)
-│   │   └── repository.go            # Read/write .data JSON files
+│   │   └── repository.go            # Read/write .data-workflow-fb-schedule-in JSON files
 │   ├── logger/
 │   │   └── logger.go                # Structured logger
 │   ├── pages/
@@ -94,7 +94,7 @@ Scheduling data lives in `.data/scheduling-engine/fb-reels.json`. Browser cookie
 │       ├── fb_reels.go              # Facebook Reels scheduling workflow
 │       ├── google_flow.go           # Google Flow video generation workflow
 │       └── youtube.go               # YouTube session workflow
-├── .data/                           # Runtime data (git-ignored)
+├── .data-workflow-fb-schedule-in/   # Runtime data (git-ignored)
 ├── go.mod
 └── go.sum
 ```

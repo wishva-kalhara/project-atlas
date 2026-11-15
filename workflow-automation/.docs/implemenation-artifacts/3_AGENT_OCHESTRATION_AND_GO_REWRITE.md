@@ -37,7 +37,7 @@ Rather than isolating the Go code into a subfolder (`agent-ochestration-v1`), th
 1. `d:\content-creation\workflow-automation\` compiles directly into a **single standalone executable** (`orchestrate.exe` on Windows).
 2. The root Go application natively drives browser automation via `github.com/playwright-community/playwright-go`.
 3. Node.js, `npm`, and `ui-workflows/node_modules` are **completely eliminated** from the runtime dependency chain.
-4. Relative pathing is greatly simplified: `.data/scheduling-engine/fb-reels.json` and `cookies.json` live directly relative to the workspace root without complex `../..` traversal.
+4. Relative pathing is greatly simplified: `.data-workflow-fb-schedule-in/metadata.json` and `cookies.json` live directly relative to the workspace root without complex `../..` traversal.
 5. The CLI handles Facebook Reel scheduling, Google Flow video generation, YouTube verification, status reporting, and automatic browser/driver bootstrapping.
 
 ### 1.2 Technology Stack
@@ -85,9 +85,9 @@ flowchart TD
         end
 
         subgraph StateStore ["Local State Store"]
-            DATA_FB[(".data/scheduling-engine/fb-reels.json")]
+            DATA_FB[(".data-workflow-fb-schedule-in/metadata.json")]
             COOKIES[("cookies.json")]
-            ASSETS[(".data/raw/*.mp4")]
+            ASSETS[(".data-workflow-fb-schedule-in/raw/*.mp4")]
         end
     end
 
@@ -149,11 +149,10 @@ Everything is placed directly in the workspace root `d:\content-creation\workflo
 
 ```
 d:\content-creation\workflow-automation/
-├── .data/
+├── .data-workflow-fb-schedule-in/
 │   ├── raw/
 │   │   └── 2026_11_22.mp4       # Video assets
-│   └── scheduling-engine/
-│       └── fb-reels.json        # Reels metadata & status tracking
+│   └── metadata.json            # Reels metadata & status tracking
 ├── cmd/
 │   ├── root.go                  # Root command, global flags (--headed, --debug)
 │   ├── schedule_fb.go           # 'schedule-fb' command: Runs FB reel scheduling
@@ -166,7 +165,7 @@ d:\content-creation\workflow-automation/
 │   │   └── config.go            # Reads .env, provides root paths, URLs, timeouts
 │   ├── data/
 │   │   ├── models.go            # FbReelsData, Post, SchedulingInfo structs
-│   │   └── repository.go        # Read, mutate & atomic write of fb-reels.json
+│   │   └── repository.go        # Read, mutate & atomic write of metadata.json
 │   ├── browser/
 │   │   ├── session.go           # Playwright initialization, context creation & cleanup
 │   │   └── cookies.go           # Cookie / StorageState persistence helpers
@@ -196,7 +195,7 @@ d:\content-creation\workflow-automation/
 ## 5. Data Models & State Management
 
 ### 5.1 Structs (`internal/data/models.go`)
-Reflects the exact JSON contract in `.data/scheduling-engine/fb-reels.json`:
+Reflects the exact JSON contract in `.data-workflow-fb-schedule-in/metadata.json`:
 
 ```go
 package data
@@ -315,12 +314,12 @@ func Load() (*Config, error) {
 	execDir, _ := os.Getwd()
 	// Detect workspace root
 	workspaceRoot := execDir
-	if _, err := os.Stat(filepath.Join(execDir, ".data")); os.IsNotExist(err) {
+	if _, err := os.Stat(filepath.Join(execDir, ".data-workflow-fb-schedule-in")); os.IsNotExist(err) {
 		// If running from a subdirectory
 		workspaceRoot = filepath.Clean(filepath.Join(execDir, ".."))
 	}
 
-	fbDataPath := filepath.Join(workspaceRoot, ".data", "scheduling-engine", "fb-reels.json")
+	fbDataPath := filepath.Join(workspaceRoot, ".data-workflow-fb-schedule-in", "metadata.json")
 	cookiePath := filepath.Join(workspaceRoot, "cookies.json")
 
 	return &Config{
@@ -990,7 +989,7 @@ func init() {
   }
   ```
 * **`cmd/status.go`**:
-  Renders a formatted table of all posts from `.data/scheduling-engine/fb-reels.json` showing caption preview, video path, `tried`, and `isSuccess`.
+  Renders a formatted table of all posts from `.data-workflow-fb-schedule-in/metadata.json` showing caption preview, video path, `tried`, and `isSuccess`.
 * **`cmd/setup.go`**:
   Executes `playwright.Install()` to download drivers and browser binaries if running on a fresh host without host Chrome.
 
@@ -1081,7 +1080,7 @@ Any autonomous agent or engineer can execute this complete rewrite directly in t
 ### Phase 5: Verification & Cleanup
 1. Run `go vet ./...`.
 2. Execute `.\build.ps1` to produce `orchestrate.exe`.
-3. Execute `.\orchestrate.exe status` to verify repository connectivity to `.data/scheduling-engine/fb-reels.json`.
+3. Execute `.\orchestrate.exe status` to verify repository connectivity to `.data-workflow-fb-schedule-in/metadata.json`.
 4. Execute `.\orchestrate.exe schedule-fb --headed` to execute the live Facebook Reel automation.
 5. (Optional) Archive or remove `agent-ochestration-v1` and `ui-workflows`.
 
@@ -1092,9 +1091,9 @@ Any autonomous agent or engineer can execute this complete rewrite directly in t
 | Checkpoint | Validation Test | Expected Result |
 | :--- | :--- | :--- |
 | **Compilation** | `go build -o orchestrate.exe main.go` | Zero compiler errors; produces root `orchestrate.exe` (~20MB) |
-| **State Inspection** | `.\orchestrate.exe status` | Correctly parses and displays all 4 posts in `.data/scheduling-engine/fb-reels.json` |
+| **State Inspection** | `.\orchestrate.exe status` | Correctly parses and displays all 4 posts in `.data-workflow-fb-schedule-in/metadata.json` |
 | **Driver Bootstrapping** | `.\orchestrate.exe setup` | Successfully installs Playwright driver without Node.js |
 | **Browser Launch** | `.\orchestrate.exe youtube --headed` | Launches host Google Chrome, navigates to YouTube, closes cleanly |
-| **FB Automation** | `.\orchestrate.exe schedule-fb --headed` | Navigates to FB page, pauses for sign-in if needed, opens Creator Dashboard, attaches `.data/raw/2026_11_22.mp4` via native file chooser, sets caption, schedules reel, and updates `isSuccess: true` in `fb-reels.json` |
-| **Direct Paths** | Run from any directory | Loads `.data/scheduling-engine/fb-reels.json` and `cookies.json` without broken `../..` relative paths |
+| **FB Automation** | `.\orchestrate.exe schedule-fb --headed` | Navigates to FB page, pauses for sign-in if needed, opens Creator Dashboard, attaches `.data-workflow-fb-schedule-in/raw/2026_11_22.mp4` via native file chooser, sets caption, schedules reel, and updates `isSuccess: true` in `metadata.json` |
+| **Direct Paths** | Run from any directory | Loads `.data-workflow-fb-schedule-in/metadata.json` and `cookies.json` without broken `../..` relative paths |
 | **Self-Contained** | Run without `node_modules` | Functions completely independent of `ui-workflows/node_modules` |

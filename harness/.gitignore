@@ -1,4 +1,4 @@
 .chrome-profile
-.data
-.input
+.data-harness-gemini-out
+.data-harness-gemini-in
 harness.exe

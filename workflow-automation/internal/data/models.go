@@ -1,6 +1,6 @@
 package data
 
-// Structs matching the JSON contract in `.data/scheduling-engine/fb-reels.json`
+// Structs matching the JSON contract in `.data-workflow-fb-schedule-in/metadata.json`
 
 type SchedulingInfo struct {
     IsSuccess bool `json:"isSuccess"`

@@ -32,8 +32,8 @@ type evalStatus struct {
 
 func main() {
 	chatURL := flag.String("url", "", "Full URL of your existing Gemini chat (e.g. https://gemini.google.com/app/abc123xyz)")
-	inputDir := flag.String("input", ".input", "Folder containing human-prompts.json and images")
-	outputDir := flag.String("output", ".data", "Folder where <tag>.md files will be saved")
+	inputDir := flag.String("input", ".data-harness-gemini-in", "Folder containing human-prompts.json and images")
+	outputDir := flag.String("output", ".data-harness-gemini-out", "Folder where <tag>.md files will be saved")
 	profileDir := flag.String("profile", ".chrome-profile", "Folder to persist your Google login session")
 	flag.Parse()
 
@@ -133,7 +133,7 @@ func main() {
 			log.Fatalf("Timeout or error waiting for response on '%s': %v", entry.Tag, err)
 		}
 
-		// Save output to .data/<tag>.md
+		// Save output to .data-harness-gemini-out/<tag>.md
 		outPath := filepath.Join(*outputDir, entry.Tag+".md")
 		if err := os.WriteFile(outPath, []byte(responseText), 0644); err != nil {
 			log.Fatalf("Failed to write %s: %v", outPath, err)

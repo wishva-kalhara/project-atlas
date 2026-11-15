@@ -1,7 +1,7 @@
 .agents/skills/*
 !.agents/skills/ui-workflow-pro
 
-.data
+.data-workflow-fb-schedule-in
 .playwright
 workflow-exec.exe
 workflow-exec-gui.exe
