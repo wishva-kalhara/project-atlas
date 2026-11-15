@@ -1,0 +1,116 @@
+package main
+
+import (
+	"encoding/json"
+	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
+)
+
+// PromptEntry mirrors the shape in .data-harness-gemini-in/human-prompts.json
+type PromptEntry struct {
+	Tag    string   `json:"tag"`
+	Images []string `json:"images"`
+	Text   string   `json:"text"`
+}
+
+// InputPayload mirrors the top-level JSON object in human-prompts.json
+type InputPayload struct {
+	Prompts []PromptEntry `json:"prompts"`
+}
+
+// MetadataEntry is one record written to .data-workflow-googleflow-in/metadata.json
+type MetadataEntry struct {
+	Tag         string   `json:"tag"`
+	Images      []string `json:"images"`
+	VideoPrompt string  `json:"videoPrompt"`
+}
+
+func main() {
+	if len(os.Args) < 2 || os.Args[1] != "gen-workflow-googleflow-in" {
+		fmt.Println("no action binded")
+		return
+	}
+
+	geminiInDir := ".data-harness-gemini-in"
+	geminiOutDir := ".data-harness-gemini-out"
+	googleflowOutDir := ".data-workflow-googleflow-in"
+
+	promptsPath := filepath.Join(geminiInDir, "human-prompts.json")
+	rawJSON, err := os.ReadFile(promptsPath)
+	if err != nil {
+		logFatal("Failed to read %s: %v", promptsPath, err)
+	}
+
+	var payload InputPayload
+	if err := json.Unmarshal(rawJSON, &payload); err != nil {
+		logFatal("Invalid JSON in %s: %v", promptsPath, err)
+	}
+
+	if err := os.MkdirAll(googleflowOutDir, 0755); err != nil {
+		logFatal("Failed to create output folder %s: %v", googleflowOutDir, err)
+	}
+
+	var entries []MetadataEntry
+
+	for _, entry := range payload.Prompts {
+		if entry.Tag == "" {
+			continue
+		}
+
+		mdPath := filepath.Join(geminiOutDir, entry.Tag+".md")
+		mdBytes, err := os.ReadFile(mdPath)
+		if err != nil {
+			logFatal("Failed to read %s for tag '%s': %v", mdPath, entry.Tag, err)
+		}
+
+		mdText := string(mdBytes)
+
+		// Extract everything from "FORMAT AND INTENT:" to the end of the file.
+		const marker = "FORMAT AND INTENT:"
+		idx := strings.Index(mdText, marker)
+		if idx == -1 {
+			logFatal("Marker '%s' not found in %s for tag '%s'", marker, mdPath, entry.Tag)
+		}
+		videoPrompt := strings.TrimRight(mdText[idx:], "\r\n ")
+
+		// Resolve image references to absolute paths against the input dir.
+		var absImages []string
+		for _, imgRef := range entry.Images {
+			candidate := filepath.Join(geminiInDir, filepath.Clean(imgRef))
+			absPath, err := filepath.Abs(candidate)
+			if err != nil {
+				logFatal("Failed to resolve absolute path for image '%s' on tag '%s': %v", imgRef, entry.Tag, err)
+			}
+			if _, err := os.Stat(absPath); err != nil {
+				logFatal("Image not found at '%s' for tag '%s': %v", absPath, entry.Tag, err)
+			}
+			absImages = append(absImages, absPath)
+		}
+
+		entries = append(entries, MetadataEntry{
+			Tag:         entry.Tag,
+			Images:      absImages,
+			VideoPrompt: videoPrompt,
+		})
+		fmt.Printf("Processed tag '%s' -> %d chars videoPrompt\n", entry.Tag, len(videoPrompt))
+	}
+
+	outBytes, err := json.MarshalIndent(entries, "", "    ")
+	if err != nil {
+		logFatal("Failed to marshal metadata: %v", err)
+	}
+	outBytes = append(outBytes, '\n')
+
+	outPath := filepath.Join(googleflowOutDir, "metadata.json")
+	if err := os.WriteFile(outPath, outBytes, 0644); err != nil {
+		logFatal("Failed to write %s: %v", outPath, err)
+	}
+	fmt.Printf("Wrote %s with %d entries\n", outPath, len(entries))
+}
+
+func logFatal(format string, args ...interface{}) {
+	fmt.Fprintf(os.Stderr, format+"\n", args...)
+	os.Exit(1)
+}
