@@ -36,9 +36,24 @@ func Load() (*Config, error) {
 		workspaceRoot = filepath.Clean(filepath.Join(execDir, ".."))
 	}
 
-	// fb scheduling data lives in workspace root
-	fbDataPath := filepath.Join(workspaceRoot, ".data-workflow-fb-schedule-in", "metadata.json")
-	// cookies.json should live next to the executable (wherever the binary runs from)
+	// fb scheduling data lives in the appropriate data directory (supports .dist and case variations)
+	fbDataPath := ""
+	// Prefer a data directory in the current working directory if it exists (e.g., when running from .dist)
+	// First check for the .dist subfolder (common when running the binary directly)
+	if _, err := os.Stat(filepath.Join(execDir, ".dist", ".data-workflow-fb-schedule-in", "metadata.json")); err == nil {
+		fbDataPath = filepath.Join(execDir, ".dist", ".data-workflow-fb-schedule-in", "metadata.json")
+	} else if _, err := os.Stat(filepath.Join(execDir, ".data-workflow-fb-schedule-in", "metadata.json")); err == nil {
+		fbDataPath = filepath.Join(execDir, ".data-workflow-fb-schedule-in", "metadata.json")
+	} else if _, err := os.Stat(filepath.Join(execDir, ".data-workflow-fbSchedule-in", "metadata.json")); err == nil {
+		fbDataPath = filepath.Join(execDir, ".data-workflow-fbSchedule-in", "metadata.json")
+	} else if _, err := os.Stat(filepath.Join(workspaceRoot, ".data-workflow-fb-schedule-in", "metadata.json")); err == nil {
+		fbDataPath = filepath.Join(workspaceRoot, ".data-workflow-fb-schedule-in", "metadata.json")
+	} else if _, err := os.Stat(filepath.Join(workspaceRoot, ".data-workflow-fbSchedule-in", "metadata.json")); err == nil {
+		fbDataPath = filepath.Join(workspaceRoot, ".data-workflow-fbSchedule-in", "metadata.json")
+	} else {
+		// Default fallback (may error later if missing)
+		fbDataPath = filepath.Join(workspaceRoot, ".data-workflow-fb-schedule-in", "metadata.json")
+	}	// cookies.json should live next to the executable (wherever the binary runs from)
 	cookiePath := filepath.Join(execDir, "cookies.json")
 
 	cfg := &Config{

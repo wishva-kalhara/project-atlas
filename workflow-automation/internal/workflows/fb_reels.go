@@ -90,7 +90,12 @@ func (w *FbReelsWorkflow) Run(headed bool) error {
             continue
         }
 
-        videoAbsPath := filepath.Clean(filepath.Join(w.cfg.WorkspaceRoot, post.VideoPath))
+        // Determine absolute video path; if post.VideoPath is already absolute, use it directly, otherwise join with WorkspaceRoot
+    videoAbsPath := post.VideoPath
+    if !filepath.IsAbs(videoAbsPath) {
+        videoAbsPath = filepath.Join(w.cfg.WorkspaceRoot, videoAbsPath)
+    }
+    videoAbsPath = filepath.Clean(videoAbsPath)
         if _, err := os.Stat(videoAbsPath); os.IsNotExist(err) {
             logger.Error("FbReelsWorkflow:Run", fmt.Sprintf("Video file not found at %s. Marking tried=true", videoAbsPath))
             post.SchedulingInfo.Tried = true
