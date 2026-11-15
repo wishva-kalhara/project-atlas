@@ -23,19 +23,23 @@ func Load() (*Config, error) {
 	// Load .env if present (ignore errors)
 	_ = godotenv.Load(".env")
 
-	// Determine workspace root (current working dir or its parent if .data-workflow-fb-schedule-in missing)
+	// Determine executable directory (current working directory)
 	execDir, err := os.Getwd()
 	if err != nil {
 		return nil, err
 	}
+
+	// Workspace root: current working dir or its parent if .data-workflow-fb-schedule-in missing
 	workspaceRoot := execDir
 	if _, err := os.Stat(filepath.Join(execDir, ".data-workflow-fb-schedule-in")); os.IsNotExist(err) {
 		// Running from a subdirectory, step up one level
 		workspaceRoot = filepath.Clean(filepath.Join(execDir, ".."))
 	}
 
+	// fb scheduling data lives in workspace root
 	fbDataPath := filepath.Join(workspaceRoot, ".data-workflow-fb-schedule-in", "metadata.json")
-	cookiePath := filepath.Join(workspaceRoot, "cookies.json")
+	// cookies.json should live next to the executable (wherever the binary runs from)
+	cookiePath := filepath.Join(execDir, "cookies.json")
 
 	cfg := &Config{
 		WorkspaceRoot:         workspaceRoot,
