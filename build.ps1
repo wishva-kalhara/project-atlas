@@ -1,7 +1,7 @@
 <#
 .SYNOPSIS
-    Builds harness.exe, tools.exe, and workflow-exec.exe and places the
-    final artifacts in .dist/
+    Builds atlas.exe, harness.exe, tools.exe, and workflow-exec.exe and places
+    the final artifacts in .dist/
 .DESCRIPTION
     Each module is built with `go build` from its own directory (so the
     working-directory-relative paths in each binary resolve correctly), then
@@ -14,12 +14,11 @@ param()
 
 $ErrorActionPreference = "Stop"
 
-# Resolve repo root from this script's location (works regardless of the
-# current working directory).
 $RepoRoot = Split-Path -Parent $PSCommandPath
 $DistDir  = Join-Path $RepoRoot ".dist"
 
 $modules = @(
+    @{ Name = "atlas";               Path = "atlas";               Out = "atlas.exe" }
     @{ Name = "harness";             Path = "harness";             Out = "harness.exe" }
     @{ Name = "tools";               Path = "tools";               Out = "tools.exe" }
     @{ Name = "workflow-automation"; Path = "workflow-automation"; Out = "workflow-exec.exe" }
@@ -27,7 +26,6 @@ $modules = @(
 
 Write-Host "==> Building artifacts into $DistDir"
 
-# Fresh output directory.
 if (Test-Path $DistDir) {
     Remove-Item -Recurse -Force $DistDir
 }
@@ -45,7 +43,6 @@ foreach ($m in $modules) {
         continue
     }
 
-    # Build from inside the module directory so relative paths work.
     Push-Location $modDir
     try {
         go build -o $m.Out .

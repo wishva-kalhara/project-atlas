@@ -1,3 +1,4 @@
 .dist
 .tmp/.chrome-profile
 cookies.json
+.tmp
