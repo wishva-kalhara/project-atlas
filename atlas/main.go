@@ -1,12 +1,15 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/charmbracelet/huh"
 	"github.com/charmbracelet/lipgloss"
@@ -203,14 +206,55 @@ func runFbSchedulingFlow() {
 
 // executeCommand runs the target binary and pipes output directly to the user's terminal
 func executeCommand(bin string, args []string) error {
-	cleanBin := filepath.FromSlash(bin)
+	// Resolve binary relative to atlas.exe's own folder (.dist)
+	exePath, err := os.Executable()
+	if err != nil {
+		return err
+	}
+	exeDir := filepath.Dir(exePath)
+	cleanBin := filepath.Join(exeDir, filepath.Base(bin))
 
 	cmd := exec.Command(cleanBin, args...)
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
+	cmd.Dir = exeDir
 	cmd.Stdin = os.Stdin
+	// Force unbuffered output for Go/Python/Node child tools if supported
+	cmd.Env = append(os.Environ(), "PYTHONUNBUFFERED=1", "FORCE_COLOR=1")
 
-	return cmd.Run()
+	stdoutPipe, err := cmd.StdoutPipe()
+	if err != nil {
+		return err
+	}
+	stderrPipe, err := cmd.StderrPipe()
+	if err != nil {
+		return err
+	}
+
+	if err := cmd.Start(); err != nil {
+		return err
+	}
+
+	tag := filepath.Base(bin)
+	outPrefix := lipgloss.NewStyle().Foreground(lipgloss.Color("#00A8FF")).Render(fmt.Sprintf("[%s] ", tag))
+	errPrefix := lipgloss.NewStyle().Foreground(lipgloss.Color("#FF5F87")).Render(fmt.Sprintf("[%s ERR] ", tag))
+
+	var wg sync.WaitGroup
+	wg.Add(2)
+
+	streamLogs := func(r io.Reader, prefix string, out io.Writer) {
+		defer wg.Done()
+		scanner := bufio.NewScanner(r)
+		// Increase buffer size to 1MB in case tools print long JSON lines
+		scanner.Buffer(make([]byte, 64*1024), 1024*1024)
+		for scanner.Scan() {
+			fmt.Fprintf(out, "%s%s\n", prefix, scanner.Text())
+		}
+	}
+
+	go streamLogs(stdoutPipe, outPrefix, os.Stdout)
+	go streamLogs(stderrPipe, errPrefix, os.Stderr)
+
+	wg.Wait()
+	return cmd.Wait()
 }
 
 // hasDataFolders checks if any directory matching ".data*" exists in the working directory
