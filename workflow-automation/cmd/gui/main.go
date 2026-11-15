@@ -18,14 +18,14 @@ import (
 type WorkflowOption struct {
 	Name        string
 	Description string
-	Run         func(headed bool) error
+	Run         func(headed bool, index int) error
 }
 
 var menuOptions = []WorkflowOption{
 	{
 		Name:        "Schedule Facebook Reels",
 		Description: "Schedule pending reels to Facebook Creator Dashboard",
-		Run: func(headed bool) error {
+		Run: func(headed bool, index int) error {
 			cfg, err := config.Load()
 			if err != nil {
 				return err
@@ -38,19 +38,19 @@ var menuOptions = []WorkflowOption{
 	{
 		Name:        "Generate Video (Google Flow)",
 		Description: "Run Google Flow video generation workflow",
-		Run: func(headed bool) error {
+		Run: func(headed bool, index int) error {
 			cfg, err := config.Load()
 			if err != nil {
 				return err
 			}
 			wf := workflows.NewGoogleFlowWorkflow(cfg)
-			return wf.Run(headed)
+			return wf.Run(headed, index)
 		},
 	},
 	{
 		Name:        "Open YouTube",
 		Description: "Open YouTube in a browser session (verification helper)",
-		Run: func(headed bool) error {
+		Run: func(headed bool, index int) error {
 			cfg, err := config.Load()
 			if err != nil {
 				return err
@@ -62,7 +62,7 @@ var menuOptions = []WorkflowOption{
 	{
 		Name:        "Show Status",
 		Description: "Print current scheduling state for Facebook reels",
-		Run: func(headed bool) error {
+		Run: func(headed bool, index int) error {
 			cfg, err := config.Load()
 			if err != nil {
 				return err
@@ -91,7 +91,7 @@ var menuOptions = []WorkflowOption{
 	{
 		Name:        "Setup Playwright",
 		Description: "Download Playwright driver and Chromium browser",
-		Run: func(headed bool) error {
+		Run: func(headed bool, index int) error {
 			return playwright.Install(&playwright.RunOptions{Browsers: []string{"chromium"}})
 		},
 	},
@@ -102,6 +102,9 @@ func main() {
 	if v := os.Getenv("WORKFLOW_EXEC_HEADLESS"); v == "1" || strings.EqualFold(v, "true") {
 		headed = false
 	}
+
+	// Ask for index for video-gen
+	index := 0
 
 	clearScreen()
 	fmt.Println("╔══════════════════════════════════════════════════════════════╗")
@@ -141,11 +144,26 @@ func main() {
 		return
 	}
 
+	// If video-gen selected, ask for index
+	if choice == 2 { // Generate Video (Google Flow)
+		fmt.Print("\nEnter metadata index (default 0): ")
+		var indexInput string
+		fmt.Scanln(&indexInput)
+		indexInput = strings.TrimSpace(indexInput)
+		if indexInput != "" {
+			_, err := fmt.Sscanf(indexInput, "%d", &index)
+			if err != nil {
+				fmt.Println("Invalid index, using default 0")
+				index = 0
+			}
+		}
+	}
+
 	selected := menuOptions[choice-1]
 	fmt.Printf("\nRunning: %s\n", selected.Name)
 	fmt.Println(strings.Repeat("-", 60))
 
-	if err := selected.Run(headed); err != nil {
+	if err := selected.Run(headed, index); err != nil {
 		logger.Error("gui", err.Error())
 		fmt.Printf("\nError: %v\n", err)
 		waitForEnter()
