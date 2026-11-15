@@ -33,6 +33,7 @@ The tool is command-driven. Running it with no matching command prints
 
 ```bash
 ./tools.exe                 # -> "no action binded"
+./tools.exe new-workflow-fbScheduling
 ./tools.exe gen-workflow-googleflow-in
 ./tools.exe gen-workflow-fbSchedule-in --fbPageSlug <slug> --pageName "<name>"
 ./tools.exe clear-tmp-data
@@ -90,6 +91,32 @@ Deletes all `.data*` directories in the working directory, leaving only source f
 ```bash
 ./tools.exe clear-tmp-data
 ```
+
+### `new-workflow-fbScheduling`
+
+Creates `.data-harness-gemini-in/human-prompts.json` with an example prompt structure. This is the starting point for a new Facebook scheduling workflow.
+
+```bash
+./tools.exe new-workflow-fbScheduling
+```
+
+Produces:
+
+```json
+{
+    "prompts": [
+        {
+            "tag": "example-tag",
+            "images": [
+                "./example-image.png"
+            ],
+            "text": "Create an ultra-length prompt for this subject. A detailed scene description here."
+        }
+    ]
+}
+```
+
+After creating the file, edit it to add your actual tags, image paths, and prompt texts. Then run the Gemini harness to generate `.md` files in `.data-harness-gemini-out/`.
 
 ## Folder layout
 

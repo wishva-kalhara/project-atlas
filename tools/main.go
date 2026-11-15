@@ -61,6 +61,8 @@ func main() {
 		runGenWorkflowFBScheduleIn(os.Args[2:])
 	case "clear-tmp-data":
 		runClearTmpData()
+	case "new-workflow-fbScheduling":
+		runNewWorkflowFBScheduling()
 	default:
 		fmt.Println("no action binded")
 	}
@@ -294,6 +296,37 @@ func runClearTmpData() {
 		deleted++
 	}
 	fmt.Printf("Cleared %d .data* entries in %s\n", deleted, wd)
+}
+
+func runNewWorkflowFBScheduling() {
+	geminiInDir := ".data-harness-gemini-in"
+
+	if err := os.MkdirAll(geminiInDir, 0755); err != nil {
+		logFatal("Failed to create input folder %s: %v", geminiInDir, err)
+	}
+
+	exampleEntry := PromptEntry{
+		Tag:    "example-tag",
+		Images: []string{"./example-image.png"},
+		Text:   "Create an ultra-length prompt for this subject. A detailed scene description here.",
+	}
+	examplePayload := InputPayload{
+		Prompts: []PromptEntry{exampleEntry},
+	}
+
+	outBytes, err := json.MarshalIndent(examplePayload, "", "    ")
+	if err != nil {
+		logFatal("Failed to marshal example human-prompts.json: %v", err)
+	}
+	outBytes = append(outBytes, '\n')
+
+	promptsPath := filepath.Join(geminiInDir, "human-prompts.json")
+	if err := os.WriteFile(promptsPath, outBytes, 0644); err != nil {
+		logFatal("Failed to write %s: %v", promptsPath, err)
+	}
+	fmt.Printf("Created %s with example prompt\n", promptsPath)
+	fmt.Println("Edit the file to add your tags, images, and prompt texts.")
+	fmt.Println("Then run the Gemini harness to generate .md files in .data-harness-gemini-out/")
 }
 
 func logFatal(format string, args ...interface{}) {
