@@ -1,0 +1,8 @@
+.agents/skills/*
+!.agents/skills/ui-workflow-pro
+
+.data
+.playwright
+workflow-exec.exe
+workflow-exec-gui.exe
+cookies.json

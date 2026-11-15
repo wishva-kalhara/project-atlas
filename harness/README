@@ -1,0 +1,24 @@
+# Harness
+
+A single-binary Windows CLI tool written in Go that attaches to an **existing Gemini web conversation** (including chats started with your custom Gems), uploads images from `.input/`, sends prompts serially one-by-one, and saves each response to `.data/<tag>.md`.
+
+## Prerequisites
+
+1. **Go 1.23+** installed on your machine (`go version`).
+2. **Google Chrome** installed on your Windows machine.
+3. An **existing Gemini chat URL** (e.g., `https://gemini.google.com/app/1234567890abcdef`).
+
+## Folder Setup
+
+Ensure your `harness/` directory looks like this before running:
+
+```text
+harness/
+├── go.mod
+├── main.go
+├── README.md
+└── .input/
+    ├── human-prompts.json
+    ├── image1.png
+    ├── image2.jpg
+    └── image3.png
