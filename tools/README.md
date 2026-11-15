@@ -35,6 +35,7 @@ The tool is command-driven. Running it with no matching command prints
 ./tools.exe                 # -> "no action binded"
 ./tools.exe gen-workflow-googleflow-in
 ./tools.exe gen-workflow-fbSchedule-in --fbPageSlug <slug> --pageName "<name>"
+./tools.exe clear-tmp-data
 ```
 
 ### `gen-workflow-googleflow-in`
@@ -81,6 +82,14 @@ the `CAPTION` section from each `.data-harness-gemini-out/<tag>.md` into the
 ```
 
 Both `--fbPageSlug` and `--pageName` are required.
+
+### `clear-tmp-data`
+
+Deletes all `.data*` directories in the working directory, leaving only source files and the binary. Use this to reset the workspace to a clean state.
+
+```bash
+./tools.exe clear-tmp-data
+```
 
 ## Folder layout
 

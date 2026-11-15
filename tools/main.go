@@ -59,6 +59,8 @@ func main() {
 		runGenWorkflowGoogleFlowIn()
 	case "gen-workflow-fbSchedule-in":
 		runGenWorkflowFBScheduleIn(os.Args[2:])
+	case "clear-tmp-data":
+		runClearTmpData()
 	default:
 		fmt.Println("no action binded")
 	}
@@ -265,6 +267,33 @@ func extractCaption(mdText string) string {
 
 	caption := mdText[startIdx : startIdx+endIdx]
 	return strings.TrimSpace(caption)
+}
+
+func runClearTmpData() {
+	wd, err := os.Getwd()
+	if err != nil {
+		logFatal("Failed to get current working directory: %v", err)
+	}
+
+	entries, err := os.ReadDir(wd)
+	if err != nil {
+		logFatal("Failed to read directory %s: %v", wd, err)
+	}
+
+	deleted := 0
+	for _, entry := range entries {
+		name := entry.Name()
+		if !strings.HasPrefix(name, ".data") {
+			continue
+		}
+		path := filepath.Join(wd, name)
+		if err := os.RemoveAll(path); err != nil {
+			logFatal("Failed to remove %s: %v", path, err)
+		}
+		fmt.Printf("Removed %s\n", path)
+		deleted++
+	}
+	fmt.Printf("Cleared %d .data* entries in %s\n", deleted, wd)
 }
 
 func logFatal(format string, args ...interface{}) {

@@ -2,3 +2,4 @@
 2. `./tools.exe gen-workflow-googleflow-in`
 3. `./workflow-exec.exe video-gen --headed --index=0`
 4. `./tools.exe gen-workflow-fbSchedule-in --fbPageSlug "marine.masterpieces" --pageName "Marine Masterpieces"`
+5. `./tools.exe clear-tmp-data`
