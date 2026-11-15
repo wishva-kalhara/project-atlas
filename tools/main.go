@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"flag"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -24,15 +25,46 @@ type InputPayload struct {
 type MetadataEntry struct {
 	Tag         string   `json:"tag"`
 	Images      []string `json:"images"`
-	VideoPrompt string  `json:"videoPrompt"`
+	VideoPrompt string   `json:"videoPrompt"`
+}
+
+// SchedulingInfo mirrors the contract in workflow-automation/internal/data/models.go
+type SchedulingInfo struct {
+	IsSuccess bool `json:"isSuccess"`
+	Tried     bool `json:"tried"`
+}
+
+// FBScheduleEntry is one record written to .data-workflow-fbSchedule-in/metadata.json
+type FBScheduleEntry struct {
+	Caption        string         `json:"caption"`
+	VideoPath      string         `json:"videoPath"`
+	SchedulingInfo SchedulingInfo `json:"schdulingInfo"`
+}
+
+// FBSchedulePayload is the top-level structure for fbSchedule metadata.json
+type FBSchedulePayload struct {
+	FbPageSlug string            `json:"fbPageSlug"`
+	PageName   string            `json:"pageName"`
+	Posts      []FBScheduleEntry `json:"posts"`
 }
 
 func main() {
-	if len(os.Args) < 2 || os.Args[1] != "gen-workflow-googleflow-in" {
+	if len(os.Args) < 2 {
 		fmt.Println("no action binded")
 		return
 	}
 
+	switch os.Args[1] {
+	case "gen-workflow-googleflow-in":
+		runGenWorkflowGoogleFlowIn()
+	case "gen-workflow-fbSchedule-in":
+		runGenWorkflowFBScheduleIn(os.Args[2:])
+	default:
+		fmt.Println("no action binded")
+	}
+}
+
+func runGenWorkflowGoogleFlowIn() {
 	geminiInDir := ".data-harness-gemini-in"
 	geminiOutDir := ".data-harness-gemini-out"
 	googleflowOutDir := ".data-workflow-googleflow-in"
@@ -108,6 +140,131 @@ func main() {
 		logFatal("Failed to write %s: %v", outPath, err)
 	}
 	fmt.Printf("Wrote %s with %d entries\n", outPath, len(entries))
+}
+
+func runGenWorkflowFBScheduleIn(args []string) {
+	fbScheduleFlags := flag.NewFlagSet("gen-workflow-fbSchedule-in", flag.ExitOnError)
+	fbPageSlug := fbScheduleFlags.String("fbPageSlug", "", "Facebook page slug (required)")
+	pageName := fbScheduleFlags.String("pageName", "", "Page name (required)")
+	fbScheduleFlags.Parse(args)
+
+	if *fbPageSlug == "" || *pageName == "" {
+		fmt.Fprintln(os.Stderr, "Error: --fbPageSlug and --pageName are required")
+		fbScheduleFlags.PrintDefaults()
+		os.Exit(1)
+	}
+
+	geminiInDir := ".data-harness-gemini-in"
+	geminiOutDir := ".data-harness-gemini-out"
+	fbScheduleOutDir := ".data-workflow-fbSchedule-in"
+	googleflowOutDir := ".data-workflow-googleflow-out"
+
+	promptsPath := filepath.Join(geminiInDir, "human-prompts.json")
+	rawJSON, err := os.ReadFile(promptsPath)
+	if err != nil {
+		logFatal("Failed to read %s: %v", promptsPath, err)
+	}
+
+	var payload InputPayload
+	if err := json.Unmarshal(rawJSON, &payload); err != nil {
+		logFatal("Invalid JSON in %s: %v", promptsPath, err)
+	}
+
+	if err := os.MkdirAll(fbScheduleOutDir, 0755); err != nil {
+		logFatal("Failed to create output folder %s: %v", fbScheduleOutDir, err)
+	}
+
+	// Get current working directory for video path
+	cwd, err := os.Getwd()
+	if err != nil {
+		logFatal("Failed to get current working directory: %v", err)
+	}
+
+	var posts []FBScheduleEntry
+
+	for _, entry := range payload.Prompts {
+		if entry.Tag == "" {
+			continue
+		}
+
+		mdPath := filepath.Join(geminiOutDir, entry.Tag+".md")
+		mdBytes, err := os.ReadFile(mdPath)
+		if err != nil {
+			logFatal("Failed to read %s for tag '%s': %v", mdPath, entry.Tag, err)
+		}
+
+		mdText := string(mdBytes)
+
+		// Extract CAPTION content (between "CAPTION:" and "## MAIN PROMPT" or end of CAPTION section)
+		caption := extractCaption(mdText)
+		if caption == "" {
+			logFatal("CAPTION not found in %s for tag '%s'", mdPath, entry.Tag)
+		}
+
+		// Build video path: {{current_path}}/.data-workflow-googleflow-out/{{tag}}.mp4
+		videoPath := filepath.Join(cwd, googleflowOutDir, entry.Tag+".mp4")
+		// Convert to forward slashes for JSON
+		videoPath = filepath.ToSlash(videoPath)
+
+		posts = append(posts, FBScheduleEntry{
+			Caption:   caption,
+			VideoPath: videoPath,
+			SchedulingInfo: SchedulingInfo{
+				IsSuccess: false,
+				Tried:     false,
+			},
+		})
+		fmt.Printf("Processed tag '%s' -> caption: %d chars\n", entry.Tag, len(caption))
+	}
+
+	fbPayload := FBSchedulePayload{
+		FbPageSlug: *fbPageSlug,
+		PageName:   *pageName,
+		Posts:      posts,
+	}
+
+	outBytes, err := json.MarshalIndent(fbPayload, "", "    ")
+	if err != nil {
+		logFatal("Failed to marshal fbSchedule metadata: %v", err)
+	}
+	outBytes = append(outBytes, '\n')
+
+	outPath := filepath.Join(fbScheduleOutDir, "metadata.json")
+	if err := os.WriteFile(outPath, outBytes, 0644); err != nil {
+		logFatal("Failed to write %s: %v", outPath, err)
+	}
+	fmt.Printf("Wrote %s with %d posts\n", outPath, len(posts))
+}
+
+// extractCaption extracts the caption text from the markdown file.
+// The caption is between "CAPTION:" and "## MAIN PROMPT (copy-paste)" or the next major section.
+func extractCaption(mdText string) string {
+	captionMarker := "CAPTION:"
+	startIdx := strings.Index(mdText, captionMarker)
+	if startIdx == -1 {
+		return ""
+	}
+	startIdx += len(captionMarker)
+
+	// Find the end - either "## MAIN PROMPT" or "## " (next section)
+	endMarkers := []string{"## MAIN PROMPT", "\n## ", "\n# "}
+	endIdx := -1
+	for _, marker := range endMarkers {
+		idx := strings.Index(mdText[startIdx:], marker)
+		if idx != -1 {
+			if endIdx == -1 || idx < endIdx {
+				endIdx = idx
+			}
+		}
+	}
+
+	if endIdx == -1 {
+		// No end marker found, take rest of file
+		return strings.TrimSpace(mdText[startIdx:])
+	}
+
+	caption := mdText[startIdx : startIdx+endIdx]
+	return strings.TrimSpace(caption)
 }
 
 func logFatal(format string, args ...interface{}) {

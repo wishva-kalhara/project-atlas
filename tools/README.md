@@ -26,6 +26,62 @@ the JSON contract expected by the Google Flow workflow:
 ]
 ```
 
+## Commands
+
+The tool is command-driven. Running it with no matching command prints
+`no action binded` and exits:
+
+```bash
+./tools.exe                 # -> "no action binded"
+./tools.exe gen-workflow-googleflow-in
+./tools.exe gen-workflow-fbSchedule-in --fbPageSlug <slug> --pageName "<name>"
+```
+
+### `gen-workflow-googleflow-in`
+
+Reads `.data-harness-gemini-in/human-prompts.json` for the list of tags and
+their associated images, extracts the `FORMAT AND INTENT:` prompt from each
+`.data-harness-gemini-out/<tag>.md`, and writes
+`.data-workflow-googleflow-in/metadata.json`:
+
+```json
+[
+  {
+    "tag": "11-23-1",
+    "images": ["./image.png"],
+    "videoPrompt": "FORMAT AND INTENT: ..."
+  }
+]
+```
+
+### `gen-workflow-fbSchedule-in`
+
+Reads `.data-harness-gemini-in/human-prompts.json` for the list of tags, copies
+the `CAPTION` section from each `.data-harness-gemini-out/<tag>.md` into the
+`caption` field of a post, and points each post at its rendered video at
+`{{current_path}}/.data-workflow-googleflow-out/<tag>.mp4`. Writes
+`.data-workflow-fbSchedule-in/metadata.json` in the shape consumed by
+`workflow-automation`:
+
+```json
+{
+  "fbPageSlug": "marine.masterpieces",
+  "pageName": "Marine masterpieces",
+  "posts": [
+    {
+      "caption": "Watch This Peacock Mantis Shrimp Stand Its Ground 🦐 ...",
+      "videoPath": "D:/Projects/project-atlas/tools/.data-workflow-googleflow-out/11-23-1.mp4",
+      "schdulingInfo": {
+        "isSuccess": false,
+        "tried": false
+      }
+    }
+  ]
+}
+```
+
+Both `--fbPageSlug` and `--pageName` are required.
+
 ## Folder layout
 
 ```
@@ -36,7 +92,8 @@ tools/
 ├── README.md
 ├── .data-harness-gemini-in/    # human-prompts.json + images (git-ignored)
 ├── .data-harness-gemini-out/   # <tag>.md files from the Gemini harness (git-ignored)
-└── .data-workflow-googleflow-in/   # metadata.json output (git-ignored)
+├── .data-workflow-googleflow-in/   # metadata.json output (git-ignored)
+└── .data-workflow-fbSchedule-in/    # metadata.json output (git-ignored)
 ```
 
 ## Prerequisites
@@ -50,22 +107,8 @@ tools/
 go build -o tools.exe .
 ```
 
-## Run
-
-The tool is command-driven. Running it with no matching command prints
-`no action binded` and exits:
-
-```bash
-./tools.exe                 # -> "no action binded"
-./tools.exe gen-workflow-googleflow-in
-```
-
-`gen-workflow-googleflow-in` reads the three folders relative to its own working
-directory, so run it from `tools/` (or pass the paths you want via flags if you
-ever add them).
-
 ## Re-running
 
-The tool is idempotent: it regenerates `.data-workflow-googleflow-in/metadata.json`
-from the current `.md` files each time. Re-run it whenever the Gemini harness
-produces new or updated `.md` files.
+The tool is idempotent: it regenerates its `metadata.json` from the current
+`.md` files each time. Re-run it whenever the Gemini harness produces new or
+updated `.md` files.
