@@ -20,6 +20,7 @@ const (
 	stateFile     = ".atlas_state"
 	defaultGemURL = "https://gemini.google.com/"
 	installerURL  = "https://raw.githubusercontent.com/wishva-kalhara/project-atlas/main/install.ps1"
+	version       = "v1.3.0"
 )
 
 // Step represents a single CLI execution stage in the E2E workflow
@@ -100,6 +101,9 @@ func printBanner() {
 		Foreground(lipgloss.Color("#04B575")).
 		MarginTop(1)
 
+	versionStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("#888888"))
+
 	boxStyle := lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(lipgloss.Color("#00A8FF")).
@@ -110,6 +114,7 @@ func printBanner() {
 		lipgloss.Center,
 		titleStyle.Render(logo),
 		subtitleStyle.Render("E2E WORKFLOW ORCHESTRATOR"),
+		versionStyle.Render(fmt.Sprintf("Atlas %s", version)),
 	)
 
 	fmt.Println(boxStyle.Render(content))
