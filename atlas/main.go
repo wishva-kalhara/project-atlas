@@ -18,6 +18,7 @@ import (
 const (
 	stateFile     = ".atlas_state"
 	defaultGemURL = "https://gemini.google.com/"
+	installerURL  = "https://raw.githubusercontent.com/wishva-kalhara/project-atlas/main/install.ps1"
 )
 
 // Step represents a single CLI execution stage in the E2E workflow
@@ -25,7 +26,7 @@ type Step struct {
 	Name        string
 	Bin         string
 	Args        []string
-	PromptInput bool // True if this step requires interactive user input before running
+	PromptInput bool
 }
 
 // Define the 7 sequential workflow steps
@@ -111,7 +112,6 @@ func printBanner() {
 	fmt.Println(boxStyle.Render(content))
 }
 
-// getExeDir returns the directory containing atlas.exe so paths work from anywhere
 func getExeDir() string {
 	exePath, err := os.Executable()
 	if err != nil {
@@ -126,7 +126,7 @@ func main() {
 
 		var selectedFlow string
 
-		// 1. Main Dashboard Menu
+		// Main Dashboard Menu
 		menuForm := huh.NewForm(
 			huh.NewGroup(
 				huh.NewSelect[string]().
@@ -134,6 +134,7 @@ func main() {
 					Options(
 						huh.NewOption("Generate Videos and Schedule to Facebook", "fb_schedule"),
 						huh.NewOption("Clear Current Progress", "clear_progress"),
+						huh.NewOption("Update Atlas", "update"),
 						huh.NewOption("Exit", "exit"),
 					).
 					Value(&selectedFlow),
@@ -151,8 +152,43 @@ func main() {
 			runFbSchedulingFlow()
 		case "clear_progress":
 			clearCurrentProgress()
+		case "update":
+			updateAtlas()
 		}
 	}
+}
+
+func updateAtlas() {
+	exeDir := getExeDir()
+
+	var confirm bool
+	confirmForm := huh.NewForm(
+		huh.NewGroup(
+			huh.NewConfirm().
+				Title("Update Atlas Binaries?").
+				Description(fmt.Sprintf("This will open a new PowerShell window to run the installer and close the current Atlas session.\n(Tip: Paste '%s' when prompted for the installation path)", exeDir)).
+				Affirmative("Yes, Launch Updater").
+				Negative("Cancel").
+				Value(&confirm),
+		),
+	).WithTheme(atlasTheme())
+
+	if err := confirmForm.Run(); err != nil || !confirm {
+		return
+	}
+
+	psCommand := fmt.Sprintf("irm %s | iex", installerURL)
+
+	// Open a brand-new detached PowerShell window via cmd 'start' so it stays open independently
+	cmd := exec.Command("cmd", "/c", "start", "powershell.exe", "-NoExit", "-ExecutionPolicy", "Bypass", "-Command", psCommand)
+	if err := cmd.Start(); err != nil {
+		fmt.Printf("\n[Error] Failed to open new PowerShell window: %v\n", err)
+		pauseForEnter()
+		return
+	}
+
+	fmt.Println("\nUpdater launched in a new PowerShell window. Closing Atlas so binaries can be replaced...")
+	os.Exit(0)
 }
 
 func clearCurrentProgress() {
@@ -184,7 +220,6 @@ func clearCurrentProgress() {
 		return
 	}
 
-	// Remove the step state tracker so the next run starts fresh at Step 1
 	_ = os.Remove(filepath.Join(exeDir, stateFile))
 
 	fmt.Println(strings.Repeat("-", 60))
@@ -203,10 +238,8 @@ func runFbSchedulingFlow() {
 
 	for i := startIndex; i < len(fbSchedulingSteps); i++ {
 		step := fbSchedulingSteps[i]
-		// Copy args slice so dynamic edits don't mutate the global template
 		currentArgs := append([]string{}, step.Args...)
 
-		// If this is the Gemini Harness step, ask for the URL before confirming execution
 		if step.PromptInput {
 			gemURL := defaultGemURL
 			urlForm := huh.NewForm(
@@ -234,7 +267,6 @@ func runFbSchedulingFlow() {
 		cmdPreview := fmt.Sprintf("%s %s", step.Bin, strings.Join(currentArgs, " "))
 		var action string
 
-		// 2. Stepper Confirmation Prompt before every step
 		stepForm := huh.NewForm(
 			huh.NewGroup(
 				huh.NewSelect[string]().
@@ -254,7 +286,6 @@ func runFbSchedulingFlow() {
 			os.Exit(0)
 		}
 
-		// 3. Execute the command and stream stdout/stderr live
 		fmt.Printf("\n>>> Running: %s\n", cmdPreview)
 		fmt.Println(strings.Repeat("-", 60))
 
@@ -283,7 +314,6 @@ func runFbSchedulingFlow() {
 		fmt.Println(strings.Repeat("-", 60))
 		fmt.Printf("✓ Step %d/%d completed successfully!\n\n", i+1, len(fbSchedulingSteps))
 
-		// 4. Update state after successful execution
 		if i == len(fbSchedulingSteps)-1 {
 			_ = os.Remove(filepath.Join(getExeDir(), stateFile))
 			fmt.Println("🎉 All E2E workflow steps completed and temporary data cleared!")
@@ -378,11 +408,6 @@ func detectCurrentStep() int {
 func saveStepState(nextStepIndex int) {
 	statePath := filepath.Join(getExeDir(), stateFile)
 	_ = os.WriteFile(statePath, []byte(strconv.Itoa(nextStepIndex)), 0644)
-}
-
-func fileExists(path string) bool {
-	_, err := os.Stat(path)
-	return err == nil
 }
 
 func pauseForEnter() {
