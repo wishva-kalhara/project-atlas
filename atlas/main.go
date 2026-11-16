@@ -248,7 +248,6 @@ func clearCurrentProgress() {
 	fmt.Println("\n✓ Current progress cleared. Next run will start from Step 1.")
 	pauseForEnter()
 }
-
 func runFbSchedulingFlow() {
 	startIndex := detectCurrentStep()
 
@@ -362,7 +361,18 @@ func runFbSchedulingFlow() {
 			os.Exit(1)
 		}
 
-		fmt.Printf("✓ Step %d/%d completed successfully!\n\n", i+1, len(fbSchedulingSteps))
+		fmt.Printf("✓ Step %d/%d completed successfully!\n", i+1, len(fbSchedulingSteps))
+
+		if i == 0 {
+			promptsPath := filepath.Join(getExeDir(), ".data-harness-gemini-in", "human-prompts.json")
+			if absPath, err := filepath.Abs(promptsPath); err == nil {
+				promptsPath = absPath
+			}
+			linkStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#04B575")).Underline(true)
+			fmt.Printf("→ Edit prompts here (Ctrl+Click to open): %s\n", linkStyle.Render(promptsPath))
+		}
+
+		fmt.Println()
 
 		if i == len(fbSchedulingSteps)-1 {
 			_ = os.Remove(filepath.Join(getExeDir(), stateFile))
