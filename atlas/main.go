@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -23,10 +24,11 @@ const (
 
 // Step represents a single CLI execution stage in the E2E workflow
 type Step struct {
-	Name        string
-	Bin         string
-	Args        []string
-	PromptInput bool
+	Name         string
+	Bin          string
+	Args         []string
+	PromptInput  bool
+	LoopMetadata bool // Triggers looping over .data-workflow-googleflow-in/metadata.json
 }
 
 // Define the 7 sequential workflow steps
@@ -48,9 +50,10 @@ var fbSchedulingSteps = []Step{
 		Args: []string{"gen-workflow-googleflow-in"},
 	},
 	{
-		Name: "Execute Video Generation (Headed)",
-		Bin:  "./workflow-exec.exe",
-		Args: []string{"video-gen", "--headed", "--index=0"},
+		Name:         "Execute Video Generation (Headed)",
+		Bin:          "./workflow-exec.exe",
+		Args:         []string{"video-gen", "--headed"}, // --index=N will be appended dynamically
+		LoopMetadata: true,
 	},
 	{
 		Name: "Generate Facebook Schedule Input",
@@ -118,6 +121,25 @@ func getExeDir() string {
 		return "."
 	}
 	return filepath.Dir(exePath)
+}
+
+func getMetadataItemCount() (int, error) {
+	metaPath := filepath.Join(getExeDir(), ".data-workflow-googleflow-in", "metadata.json")
+	data, err := os.ReadFile(metaPath)
+	if err != nil {
+		return 0, fmt.Errorf("failed to read %s: %w", metaPath, err)
+	}
+
+	var items []json.RawMessage
+	if err := json.Unmarshal(data, &items); err != nil {
+		return 0, fmt.Errorf("failed to parse metadata.json array: %w", err)
+	}
+
+	if len(items) == 0 {
+		return 0, fmt.Errorf("metadata.json array is empty")
+	}
+
+	return len(items), nil
 }
 
 func main() {
@@ -265,6 +287,10 @@ func runFbSchedulingFlow() {
 		}
 
 		cmdPreview := fmt.Sprintf("%s %s", step.Bin, strings.Join(currentArgs, " "))
+		if step.LoopMetadata {
+			cmdPreview += " --index=0..N (loops over .data-workflow-googleflow-in/metadata.json)"
+		}
+
 		var action string
 
 		stepForm := huh.NewForm(
@@ -286,12 +312,37 @@ func runFbSchedulingFlow() {
 			os.Exit(0)
 		}
 
-		fmt.Printf("\n>>> Running: %s\n", cmdPreview)
-		fmt.Println(strings.Repeat("-", 60))
+		var stepErr error
 
-		if err := executeCommand(step.Bin, currentArgs); err != nil {
+		if step.LoopMetadata {
+			itemCount, err := getMetadataItemCount()
+			if err != nil {
+				stepErr = err
+			} else {
+				fmt.Printf("\nFound %d item(s) in metadata.json. Executing sequentially...\n", itemCount)
+				for idx := 0; idx < itemCount; idx++ {
+					iterArgs := append(append([]string{}, currentArgs...), fmt.Sprintf("--index=%d", idx))
+					iterPreview := fmt.Sprintf("%s %s", step.Bin, strings.Join(iterArgs, " "))
+
+					fmt.Printf("\n>>> [%d/%d] Running: %s\n", idx+1, itemCount, iterPreview)
+					fmt.Println(strings.Repeat("-", 60))
+
+					if err := executeCommand(step.Bin, iterArgs); err != nil {
+						stepErr = fmt.Errorf("failed at index %d: %w", idx, err)
+						break
+					}
+					fmt.Println(strings.Repeat("-", 60))
+				}
+			}
+		} else {
+			fmt.Printf("\n>>> Running: %s\n", cmdPreview)
 			fmt.Println(strings.Repeat("-", 60))
-			fmt.Printf("\n[Error] Step %d failed: %v\n", i+1, err)
+			stepErr = executeCommand(step.Bin, currentArgs)
+			fmt.Println(strings.Repeat("-", 60))
+		}
+
+		if stepErr != nil {
+			fmt.Printf("\n[Error] Step %d failed: %v\n", i+1, stepErr)
 
 			var retry bool
 			retryForm := huh.NewForm(
@@ -311,7 +362,6 @@ func runFbSchedulingFlow() {
 			os.Exit(1)
 		}
 
-		fmt.Println(strings.Repeat("-", 60))
 		fmt.Printf("✓ Step %d/%d completed successfully!\n\n", i+1, len(fbSchedulingSteps))
 
 		if i == len(fbSchedulingSteps)-1 {
