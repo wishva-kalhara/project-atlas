@@ -2,8 +2,8 @@
 $ErrorActionPreference = "Stop"
 
 # --- CONFIGURATION ---
-$RepoOwner = "YOUR_GITHUB_USERNAME"
-$RepoName  = "YOUR_REPO_NAME"
+$RepoOwner = "wishva-kalhara"
+$RepoName  = "project-atlas"
 # Uses 'latest' release automatically
 $BaseUrl   = "https://github.com/$RepoOwner/$RepoName/releases/latest/download"
 $Binaries  = @("atlas.exe", "tools.exe", "workflow-exec.exe", "harness.exe")
