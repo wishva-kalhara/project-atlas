@@ -1,0 +1,68 @@
+name: Build and Release Atlas Binaries
+
+on:
+    push:
+        tags:
+            - "v*" # Triggers automatically when you push a tag like v1.0.0
+    workflow_dispatch: # Also allows manual triggering from the GitHub Actions tab
+        inputs:
+            tag:
+                description: "Release tag (e.g. v1.0.0)"
+                required: true
+                default: "v1.0.0"
+
+permissions:
+    contents: write # Required to create GitHub Releases and upload .exe assets
+
+jobs:
+    build-and-release:
+        runs-on: windows-latest
+
+        steps:
+            - name: Checkout repository
+              uses: actions/checkout@v4
+
+            - name: Set up Go
+              uses: actions/setup-go@v5
+              with:
+                  go-version: "1.23" # Matches or exceeds your local Go version
+                  cache: false
+
+            - name: Build all binaries via build.ps1
+              shell: pwsh
+              run: |
+                  .\build.ps1
+
+            - name: Verify build artifacts exist
+              shell: pwsh
+              run: |
+                  $expected = @("atlas.exe", "tools.exe", "workflow-exec.exe", "harness.exe")
+                  foreach ($file in $expected) {
+                    $path = Join-Path ".dist" $file
+                    if (-not (Test-Path $path)) {
+                      Write-Error "Missing expected artifact: $path"
+                      exit 1
+                    }
+                  }
+
+            - name: Determine Release Tag
+              id: get_tag
+              shell: pwsh
+              run: |
+                  if ("${{ github.event_name }}" -eq "workflow_dispatch") {
+                    echo "tag=${{ github.event.inputs.tag }}" >> $env:GITHUB_OUTPUT
+                  } else {
+                    echo "tag=${{ github.ref_name }}" >> $env:GITHUB_OUTPUT
+                  }
+
+            - name: Create GitHub Release and Upload Binaries
+              uses: softprops/action-gh-release@v2
+              with:
+                  tag_name: ${{ steps.get_tag.outputs.tag }}
+                  name: "Atlas ${{ steps.get_tag.outputs.tag }}"
+                  generate_release_notes: true
+                  files: |
+                      .dist/atlas.exe
+                      .dist/tools.exe
+                      .dist/workflow-exec.exe
+                      .dist/harness.exe
